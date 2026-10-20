@@ -1,0 +1,93 @@
+@page "/"
+@using RSSFeedReader.UI.Services
+@inject SubscriptionApiClient Api
+
+<PageTitle>Subscriptions</PageTitle>
+
+<h1>Subscriptions</h1>
+
+<form @onsubmit="AddSubscriptionAsync" @onsubmit:preventDefault>
+    <label for="subscription-url">Feed URL</label>
+    <div class="input-group mb-3">
+        <input id="subscription-url"
+               class="form-control"
+               type="text"
+               @bind="urlInput"
+               aria-describedby="subscription-help" />
+        <button class="btn btn-primary" type="submit" disabled="@isSubmitting">Add subscription</button>
+    </div>
+    <div id="subscription-help" class="form-text">Enter an RSS or Atom feed URL.</div>
+</form>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="alert alert-danger" role="alert">@errorMessage</p>
+}
+
+<h2>Your feeds</h2>
+@if (isLoading)
+{
+    <p>Loading subscriptions...</p>
+}
+else if (subscriptions.Count == 0)
+{
+    <p>No subscriptions yet.</p>
+}
+else
+{
+    <ul>
+        @foreach (var subscription in subscriptions)
+        {
+            <li>@subscription.Url</li>
+        }
+    </ul>
+}
+
+@code {
+    private readonly List<SubscriptionDto> subscriptions = [];
+    private string urlInput = string.Empty;
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSubmitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            subscriptions.AddRange(await Api.GetSubscriptionsAsync());
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Could not connect to the subscriptions service.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddSubscriptionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(urlInput) || isSubmitting)
+        {
+            return;
+        }
+
+        errorMessage = null;
+        isSubmitting = true;
+
+        try
+        {
+            subscriptions.Add(await Api.AddSubscriptionAsync(urlInput));
+            urlInput = string.Empty;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Could not add the subscription. Check that the service is running and try again.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}
